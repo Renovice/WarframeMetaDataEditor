@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>MetadataPatchEditor</AssemblyName>
+    <RootNamespace>MetadataPatchEditor</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Core\Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Ship Oodle next to the exe so cache extraction works without a Warframe install providing it. -->
+    <Content Include="..\lib\oo2core_9.dll" Link="oo2core_9.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Single-file publish skips Content files, so copy Oodle next to the published exe explicitly. -->
+  <Target Name="CopyOodleToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="..\lib\oo2core_9.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <!-- Also drop the finished self-contained exe + Oodle into the top-level Build\ folder for grab-and-run. -->
+  <Target Name="CopyToBuildFolder" AfterTargets="Publish">
+    <PropertyGroup>
+      <BuildDrop>$(MSBuildProjectDirectory)\..\..\Build\</BuildDrop>
+    </PropertyGroup>
+    <MakeDir Directories="$(BuildDrop)" />
+    <Copy SourceFiles="$(PublishDir)$(AssemblyName).exe" DestinationFolder="$(BuildDrop)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\lib\oo2core_9.dll" DestinationFolder="$(BuildDrop)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
