@@ -1,16 +1,25 @@
+// Dev harness for the Core decoder — decodes the cache and prints a catalog summary.
+// Usage:  dev [<path to your Warframe folder, or its Cache.Windows>]
+// With no argument it auto-detects a local Warframe install.
 using MetadataPatchEditor.Core;
-using System.Diagnostics;
-string cacheDir = @"C:\Users\Bartek\OneDrive\Dokumenter\Warframe\Cache.Windows";
-var bytes = Cache.ExtractPackagesBin(cacheDir);
-var sw = Stopwatch.StartNew();
-var r = PackagesBinDecoder.DecodeBytes(bytes);
-sw.Stop();
-System.Console.WriteLine($"Decoded in {sw.ElapsedMilliseconds} ms (structural locate)");
-System.Console.WriteLine($"EntityCount={r.EntityCount}  TextCount={r.TextCount}  Compressed={r.Compressed}  Raw={r.Raw}  Aligned={r.Aligned}  Types={r.Types.Count}");
-bool ok = r.EntityCount==461789 && r.TextCount==201547 && r.Compressed==198870 && r.Aligned;
-System.Console.WriteLine($"MATCHES known v46 counts: {ok}");
-if(r.Types.TryGetValue("/Lotus/Weapons/Grineer/Bows/GrnBow/GrnBowWeapon", out var t) && t.OwnText!=null){
-  foreach(var key in new[]{"reloadTime=","fireRate=","AmmoCapacity=","GripType="}){
-    int i=t.OwnText.IndexOf(key); System.Console.WriteLine("   "+(i>=0?t.OwnText.Substring(i, System.Math.Min(24, t.OwnText.Length-i)).Split('\n')[0]:key+"?"));
-  }
+
+string? cacheDir = args.Length > 0
+    ? Cache.NormalizeToCacheWindows(args[0])
+    : Cache.FindCacheWindows(AppContext.BaseDirectory);
+
+if (cacheDir == null)
+{
+    Console.WriteLine("No Cache.Windows found. Usage: dev <path to your Warframe folder or its Cache.Windows>");
+    return;
 }
+
+Console.WriteLine($"Decoding {cacheDir} ...");
+var pkg = PackagesBinDecoder.DecodeBytes(Cache.ExtractPackagesBin(cacheDir));
+var names = LanguagesBin.Decode(Cache.ExtractLanguagesBin(cacheDir, "en"));
+var cat = MetadataCatalog.Build(pkg, names);
+
+Console.WriteLine($"Types:   {pkg.Types.Count:N0}  (has-text {pkg.TextCount:N0}, aligned={pkg.Aligned})");
+Console.WriteLine($"Names:   {names.Count:N0}");
+Console.WriteLine($"Catalog: {cat.ItemCount:N0} items across {cat.ByCategory.Count} categories\n");
+foreach (var c in cat.ByCategory.OrderByDescending(kv => kv.Value.Count))
+    Console.WriteLine($"   {c.Value.Count,6}  {c.Key}");

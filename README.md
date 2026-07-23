@@ -50,3 +50,13 @@ Requires Python 3 + `zstandard` (`pip install zstandard`).
 The decoded value is the **static base** DE ships. To change what the game uses, write an
 **OpenWF metadata patch** (`OpenWF/Metadata Patches/*.txt`) — patches override the base on next
 launch. The editor helps author these; the decoder gives you the true base to start from.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The code and docs in this repo are MIT-licensed.
+
+**Not included / not covered by this license:** `oo2core_9.dll` (Oodle, RAD Game Tools / Epic) is
+proprietary and must come from your own Warframe install — it is **not** redistributed here. The
+third-party reference decoders this port learned from (Puxtril/LotusLib et al.) keep their own
+licenses; see `EDITOR_NOTES.md` §7 for the upstreams. This is a fan-made tool, not affiliated with
+or endorsed by Digital Extremes.
