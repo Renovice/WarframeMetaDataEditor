@@ -12,20 +12,21 @@
     <ProjectReference Include="..\Core\Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Ship Oodle next to the exe so cache extraction works without a Warframe install providing it. -->
-    <Content Include="..\lib\oo2core_9.dll" Link="oo2core_9.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Ship Oodle next to the exe so cache extraction works. Proprietary + git-ignored, so guard on
+         its presence: a fresh clone still builds (you supply oo2core_9.dll in editor\lib\ to run). -->
+    <Content Include="..\lib\oo2core_9.dll" Condition="Exists('..\lib\oo2core_9.dll')" Link="oo2core_9.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- Single-file publish skips Content files, so copy Oodle next to the published exe explicitly. -->
-  <Target Name="CopyOodleToPublish" AfterTargets="Publish">
+  <Target Name="CopyOodleToPublish" AfterTargets="Publish" Condition="Exists('..\lib\oo2core_9.dll')">
     <Copy SourceFiles="..\lib\oo2core_9.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
   </Target>
-  <!-- Also drop the finished self-contained exe + Oodle into the top-level Build\ folder for grab-and-run. -->
+  <!-- Also drop the finished self-contained exe (+ Oodle if present) into the top-level Build\ folder. -->
   <Target Name="CopyToBuildFolder" AfterTargets="Publish">
     <PropertyGroup>
       <BuildDrop>$(MSBuildProjectDirectory)\..\..\Build\</BuildDrop>
     </PropertyGroup>
     <MakeDir Directories="$(BuildDrop)" />
     <Copy SourceFiles="$(PublishDir)$(AssemblyName).exe" DestinationFolder="$(BuildDrop)" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="..\lib\oo2core_9.dll" DestinationFolder="$(BuildDrop)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="..\lib\oo2core_9.dll" DestinationFolder="$(BuildDrop)" SkipUnchangedFiles="true" Condition="Exists('..\lib\oo2core_9.dll')" />
   </Target>
 </Project>

@@ -10,8 +10,8 @@ the game's local `Packages.bin`, with **no game running**.
 |---|---|
 | **`editor/`** | The C# WPF editor app (`src` → `App` + `Core`; compiled build in `editor/build/`). Internal assembly name is still `MetadataPatchEditor`. |
 | **`decoder/`** | The offline `Packages.bin` decoder + cache tools. `pkg_decode_v46.py` is **the** decoder. See `decoder/README.md`. Exploratory RE history is parked in `decoder/_re_history/`. |
-| **`data/`** | The decoded datasets + ground-truth dumps. See below. |
-| **`reference/`** | Third-party parser source, incl. **Puxtril/LotusLib** — the authoritative decoder this port is based on. |
+| **`data/`** | Decoded datasets + dumps — **generated locally, git-ignored** (not in the repo). The editor doesn't need them; regenerate with the decoder scripts if you want them. |
+| **`reference/`** | Third-party parser source (Puxtril/LotusLib etc.) — **git-ignored**; external upstreams, see `EDITOR_NOTES.md` §7. |
 | **`findings/`** | `FINDINGS.md` (the chronological RE log). The solved formats + all findings are consolidated in [`EDITOR_NOTES.md`](EDITOR_NOTES.md). |
 
 ## The data (`data/`)
@@ -20,7 +20,7 @@ the game's local `Packages.bin`, with **no game running**.
 |---|---|
 | `packages_owntext.jsonl` | Every type's **raw decoded own-text** (201,546 types, full field text incl. nested blocks). |
 | `packages_effective.jsonl` | **Composed** metadata (own + inherited top-level fields) — the offline equivalent of `get_effective_metadata`, 309,787 types. |
-| `editor_dataset.json` | Merged dataset the editor consumes (dumps + public export). |
+| `editor_dataset.json` | (Legacy) merged dataset for offline analysis. The **editor decodes live from the cache** and does not require it. |
 | `dumps/` | Ground-truth `get_effective_metadata` dumps used to validate the decoder. |
 
 ## How it works (one line)
@@ -30,7 +30,29 @@ dictionary embedded in the file**. The decoder decompresses each frame against t
 composes values up the inheritance chain. Full spec (both `Packages.bin` **and** `Languages.bin`) plus
 all game-mechanics findings: [`EDITOR_NOTES.md`](EDITOR_NOTES.md).
 
-## Quick start
+## Building the editor (the Windows app)
+
+**Prerequisites**
+- **Windows** — the editor is a WPF app.
+- **.NET SDK 9.0+** — `dotnet --version` should report ≥ 9.
+- **`oo2core_9.dll`** (Oodle) — copy it from your Warframe install folder into `editor/lib/`. It's
+  proprietary so it isn't in the repo. The project **builds without it**, but the app can't read the
+  game cache until this DLL sits next to the exe.
+
+**Build & run**
+```
+# run it directly:
+dotnet run --project editor/App -c Release
+
+# …or produce the standalone single-file exe (lands in the publish folder AND in Build/):
+dotnet publish editor/App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+```
+NuGet dependencies (`ZstdSharp.Port`) restore automatically. In the app: **Decode from Cache…** →
+point it at your Warframe folder (or its `Cache.Windows`).
+
+## Decoder scripts (Python, optional)
+
+The standalone Python decoder — handy for bulk offline dumps; the editor doesn't need it.
 
 ```
 # 1) (re)extract the current Packages.bin from the game cache -> %TEMP%\Packages.bin.dec
