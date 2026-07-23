@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         "Warframes", "Necramechs", "Operator Suits", "Archwing",
         "Primary Weapons", "Secondary Weapons", "Melee Weapons", "Archwing Weapons",
         "Companion Weapons", "Amps", "Parazon",
-        "Mods", "Focus", "Rivens", "Arcanes", "Incarnon", "Amp Parts",
+        "Mods", "Focus", "Rivens", "Arcanes", "Incarnon", "Amp Parts", "Kitgun Parts", "Zaw Parts",
         "Companions", "Railjack Crew", "Railjack Weapons", "Railjack",
         "Projectiles", "Gear & Consumables", "Boosters", "Vehicles",
     };
@@ -342,6 +342,66 @@ public partial class MainWindow : Window
         {
             File.WriteAllText(dlg.FileName, p);
             Status.Text = "Saved: " + dlg.FileName;
+        }
+    }
+
+    // Combine several patch .txt files into one: ops are grouped under their type-path (so two files
+    // that edit the same type merge into one block), duplicate op lines are dropped, comments stripped.
+    void MergeBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Pick 2+ metadata patch files to merge",
+            Filter = "Metadata patch (*.txt)|*.txt",
+            Multiselect = true,
+            InitialDirectory = _patchesFolder ?? AppContext.BaseDirectory
+        };
+        if (dlg.ShowDialog() != true) return;
+        if (dlg.FileNames.Length < 2) { Status.Text = "Pick at least 2 patch files to merge."; return; }
+
+        var order = new List<string>();
+        var byType = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        int shared = 0;
+        foreach (var file in dlg.FileNames)
+        {
+            string? cur = null;
+            var seenHere = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var rawLine in File.ReadAllLines(file))
+            {
+                var trimmed = rawLine.Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith("#")) continue;
+                bool header = !char.IsWhiteSpace(rawLine[0]) && trimmed.StartsWith("/");
+                if (header)
+                {
+                    cur = trimmed;
+                    if (!byType.TryGetValue(cur, out _)) { byType[cur] = new(); order.Add(cur); }
+                    else if (seenHere.Add(cur)) shared++;    // this type also came from an earlier file
+                }
+                else if (cur != null && byType.TryGetValue(cur, out var ops) && !ops.Contains(trimmed))
+                    ops.Add(trimmed);
+            }
+        }
+        if (order.Count == 0) { Status.Text = "No patch content found in the selected files."; return; }
+
+        var sb = new StringBuilder();
+        foreach (var type in order)
+        {
+            sb.Append(type).Append('\n');
+            foreach (var op in byType[type]) sb.Append("    ").Append(op).Append('\n');
+        }
+        Preview.Text = sb.ToString();
+
+        var save = new SaveFileDialog
+        {
+            Filter = "Metadata patch (*.txt)|*.txt",
+            FileName = "Merged.txt",
+            InitialDirectory = _patchesFolder ?? AppContext.BaseDirectory
+        };
+        if (save.ShowDialog() == true)
+        {
+            File.WriteAllText(save.FileName, sb.ToString());
+            Status.Text = $"Merged {dlg.FileNames.Length} files → {order.Count} type block(s)"
+                        + (shared > 0 ? $" ({shared} shared type[s] combined)" : "") + ". Saved: " + save.FileName;
         }
     }
 

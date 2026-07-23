@@ -30,6 +30,7 @@
                 <CheckBox x:Name="GameplayCheck" Content="Gameplay only" IsChecked="True" VerticalAlignment="Center" Margin="14,0,0,0" Click="GameplayCheck_Changed"/>
                 <CheckBox x:Name="BatchCheck" Content="Batch: apply to whole filtered list" VerticalAlignment="Center" Margin="18,0,0,0"/>
                 <Button x:Name="DumpBtn" Content="Dump All…" Padding="12,7" Margin="18,0,0,0" Background="#3a7a3a" Click="DumpBtn_Click"/>
+                <Button x:Name="MergeBtn" Content="Merge Patches…" Padding="12,7" Margin="8,0,0,0" Background="#5a4a7a" Click="MergeBtn_Click" ToolTip="Combine several patch .txt files into one (ops grouped per type, duplicates removed)."/>
             </StackPanel>
         </StackPanel>
 

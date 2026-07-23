@@ -91,6 +91,7 @@ public sealed class MetadataCatalog
             if (real.StartsWith("/Lotus/Upgrades/Mods/", StringComparison.Ordinal)
                 && !real.Contains("/Randomized/", StringComparison.Ordinal)
                 && cat.EffLocalizeTag(real) != null) continue;                       // handled by the mods pass
+            if (real.StartsWith("/Lotus/Upgrades/CosmeticEnhancers/", StringComparison.Ordinal)) continue;   // arcanes -> the Arcanes pass below
             var mnm = cat.Display(real);
             if (mnm.Length > 0 && mnm.All(c => c == '?')) continue;
             candidates.Add(new CatalogItem { Path = real, Name = mnm, Category = FriendlyCategory(raw) });
@@ -145,6 +146,53 @@ public sealed class MetadataCatalog
             if (pn.Length == 0 || pn.All(c => c == '?')) continue;
             var nm = pn.EndsWith(" " + kind, StringComparison.Ordinal) ? $"{kind} · {pn[..^(kind.Length + 1)]}" : $"{kind} · {pn}";
             candidates.Add(new CatalogItem { Path = path, Name = nm, Category = "Amp Parts" });
+        }
+
+        // Kitgun Parts: the modular gun pieces (Chamber / Grip / Loader) — stat-bearing weapon pieces
+        // under /Weapons/ with a Modular marker and no ProductCategory (otherwise scattered into
+        // Blueprints/Misc). Prefix by part type so they group.
+        foreach (var (path, t) in r.Types)
+        {
+            if (!path.StartsWith("/Lotus/Weapons/", StringComparison.Ordinal)) continue;
+            if (!(path.Contains("ModularPistol", StringComparison.Ordinal) || path.Contains("ModularPrimary", StringComparison.Ordinal)
+                || path.Contains("InfModular", StringComparison.Ordinal) || path.Contains("SUModular", StringComparison.Ordinal))) continue;
+            if (cat.EffProductCategory(path) != null) continue;
+            var leaf = Leaf(path);
+            if (!leaf.EndsWith("Part", StringComparison.Ordinal)) continue;   // the crafted part pieces, not FX/projectiles/attachments
+            string kk = leaf.Contains("Barrel", StringComparison.Ordinal) ? "Chamber"
+                      : leaf.Contains("Handle", StringComparison.Ordinal) ? "Grip"
+                      : leaf.Contains("Clip", StringComparison.Ordinal) ? "Loader" : "";
+            var nm = cat.Display(path);
+            if (nm.Length == 0 || nm.All(c => c == '?')) continue;
+            candidates.Add(new CatalogItem { Path = path, Name = kk.Length > 0 ? $"{kk} · {nm}" : nm, Category = "Kitgun Parts" });
+        }
+
+        // Zaw Parts: the modular melee pieces — stat-bearing weapon pieces under /Weapons/ModularMelee/.
+        foreach (var (path, t) in r.Types)
+        {
+            if (!path.StartsWith("/Lotus/Weapons/", StringComparison.Ordinal) || !path.Contains("ModularMelee", StringComparison.Ordinal)) continue;
+            if (cat.EffProductCategory(path) != null) continue;
+            var leaf = Leaf(path);
+            if (!leaf.StartsWith("Balance", StringComparison.Ordinal) || leaf.Contains("Attachment", StringComparison.Ordinal)
+                || leaf.Contains("Gem", StringComparison.Ordinal) || leaf.Contains("Cloth", StringComparison.Ordinal)) continue;
+            var nm = cat.Display(path);
+            if (nm.Length == 0 || nm.All(c => c == '?') || nm == leaf) continue;   // real localized name (skips .fbx/.png/mat assets)
+            candidates.Add(new CatalogItem { Path = path, Name = nm, Category = "Zaw Parts" });
+        }
+
+        // Arcanes: the stat arcanes (Arcane Energize, Grace…) live under /Upgrades/CosmeticEnhancers/ with
+        // NO ProductCategory, so they otherwise land in no category. Gather the named ones, excluding the
+        // incarnon-evolution buffs that also live under CosmeticEnhancers.
+        foreach (var (path, t) in r.Types)
+        {
+            if (!path.StartsWith("/Lotus/Upgrades/CosmeticEnhancers/", StringComparison.Ordinal)) continue;
+            var leaf = Leaf(path);
+            if (leaf.Contains("Evo", StringComparison.Ordinal) || leaf.Contains("Incarnon", StringComparison.Ordinal)
+                || leaf.Contains("SubUpgrade", StringComparison.Ordinal) || leaf.Contains("Condition", StringComparison.Ordinal)
+                || leaf.EndsWith("Base", StringComparison.Ordinal)) continue;
+            var nm = cat.Display(path);
+            if (nm.Length == 0 || nm.All(c => c == '?') || nm == leaf || nm == "Arcane") continue;   // real localized arcane name
+            candidates.Add(new CatalogItem { Path = path, Name = nm, Category = "Arcanes" });
         }
 
         // Dedupe each (category, name) to the single most-canonical variant
