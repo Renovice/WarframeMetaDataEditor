@@ -1,22 +1,25 @@
+// Dev harness for the Core decoder — decodes the cache and prints a catalog summary.
+// Usage:  dev [<path to your Warframe folder, or its Cache.Windows>]
+// With no argument it auto-detects a local Warframe install.
 using MetadataPatchEditor.Core;
-string cacheDir = @"C:\Users\Bartek\OneDrive\Dokumenter\Warframe\Cache.Windows";
-var r = PackagesBinDecoder.DecodeBytes(Cache.ExtractPackagesBin(cacheDir));
-var names = LanguagesBin.Decode(Cache.ExtractLanguagesBin(cacheDir,"en"));
-var cat = MetadataCatalog.Build(r, names);
-// all types whose leaf relates to Cantic Prism (CorpAmpSet1BarrelPartA) — dump their top-level keys
-System.Console.WriteLine("=== all *CorpAmpSet1BarrelPartA* types + their top-level field keys ===");
-foreach(var p in r.Types.Keys.Where(x=>x.Contains("CorpAmpSet1BarrelPartA",System.StringComparison.OrdinalIgnoreCase)).OrderBy(x=>x)){
-  var d=DumpParser.ParseText(cat.ComposedText(p));
-  var pc=d.TopLevel.FirstOrDefault(f=>f.Key=="ProductCategory")?.RawValue.Trim()??"(none)";
-  System.Console.WriteLine($"\n  {p}  [PC={pc}]  parent={cat.Parent(p)}");
-  System.Console.WriteLine("     keys: "+string.Join(", ", d.TopLevel.Where(f=>f.Kind!=FieldKind.ComplexBlock).Select(f=>f.Key)));
-  System.Console.WriteLine("     blocks: "+string.Join(", ", d.TopLevel.Where(f=>f.Kind==FieldKind.ComplexBlock).Select(f=>f.Key)));
+
+string? cacheDir = args.Length > 0
+    ? Cache.NormalizeToCacheWindows(args[0])
+    : Cache.FindCacheWindows(AppContext.BaseDirectory);
+
+if (cacheDir == null)
+{
+    Console.WriteLine("No Cache.Windows found. Usage: dev <path to your Warframe folder or its Cache.Windows>");
+    return;
 }
-// what does a prism's parent chain / fire stats look like? check for DamagePerShot etc anywhere in composed text
-var pp="/Lotus/Weapons/Sentients/OperatorAmplifiers/CorpusAmpSet1/CorpAmpSet1BarrelPartA";
-if(r.Types.ContainsKey(pp)){
-  var txt=cat.ComposedText(pp);
-  foreach(var key in new[]{"DamagePerShot","FireRate","Trigger","CritChance","StatusChance","AmmoClipSize","ProjectileSpeed","Magazine"}){
-    int i=txt.IndexOf(key); if(i>=0) System.Console.WriteLine($"   FOUND {txt.Substring(i,System.Math.Min(40,txt.Length-i)).Split('\n')[0]}");
-  }
-}
+
+Console.WriteLine($"Decoding {cacheDir} ...");
+var pkg = PackagesBinDecoder.DecodeBytes(Cache.ExtractPackagesBin(cacheDir));
+var names = LanguagesBin.Decode(Cache.ExtractLanguagesBin(cacheDir, "en"));
+var cat = MetadataCatalog.Build(pkg, names);
+
+Console.WriteLine($"Types:   {pkg.Types.Count:N0}  (has-text {pkg.TextCount:N0}, aligned={pkg.Aligned})");
+Console.WriteLine($"Names:   {names.Count:N0}");
+Console.WriteLine($"Catalog: {cat.ItemCount:N0} items across {cat.ByCategory.Count} categories\n");
+foreach (var c in cat.ByCategory.OrderByDescending(kv => kv.Value.Count))
+    Console.WriteLine($"   {c.Value.Count,6}  {c.Key}");
