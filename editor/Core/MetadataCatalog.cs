@@ -105,21 +105,46 @@ public sealed class MetadataCatalog
             candidates.Add(new CatalogItem { Path = weaponPath, Name = nm, Category = "Rivens" });
         }
 
-        // Incarnon category: gathers Incarnon Genesis content that is otherwise scattered or unsurfaced —
-        // the evolution PERKS + unlock CHALLENGES (/Upgrades/Evolutions/, which aren't under /Mods/ so they
-        // appear in no other category), plus the dedicated Incarnon weapon FORMS (types with "Incarnon" in the
-        // path that carry a weapon ProductCategory, e.g. EntFistIncarnon = "Ruvox"). Editing is identical to a
-        // normal weapon/mod (same Path) — this is just a curated view. Names use the leaf for perks (unique +
-        // descriptive) so same-named perks on different weapons aren't collapsed by the (category,name) dedupe.
+        // Incarnon category: PER-WEAPON evolution content. Each incarnon weapon has its own
+        // ".../<Weapon>IncarnonEvolutions/" folder with NAMED perks (Torid -> "Final Fusillade"…), an
+        // "Incarnon Form" (the alt-fire form stats), and unlock challenges. Surface those, prefixed with
+        // the weapon ("Torid · Final Fusillade", "Latron · Incarnon Form") so each weapon groups together.
+        // Also keep the standalone Incarnon FORM weapons (types with "Incarnon" + a weapon ProductCategory).
         foreach (var (path, t) in r.Types)
         {
-            bool isEvo = path.StartsWith("/Lotus/Upgrades/Evolutions/", StringComparison.Ordinal);
-            bool isForm = path.Contains("Incarnon", StringComparison.OrdinalIgnoreCase)
+            int evoAt = path.IndexOf("IncarnonEvolutions/", StringComparison.Ordinal);
+            bool isForm = evoAt < 0 && path.Contains("Incarnon", StringComparison.OrdinalIgnoreCase)
                           && IncarnonWeaponCats.Contains(cat.EffProductCategory(path) ?? "");
-            if (!isEvo && !isForm) continue;
-            string nm = isForm ? cat.Display(path) : PrettyLeaf(Leaf(path));
+            if (evoAt < 0 && !isForm) continue;
+            var leaf = Leaf(path);
+            if (leaf.Contains("SubMod", StringComparison.Ordinal) || leaf.Contains("Condition", StringComparison.Ordinal)
+                || leaf.EndsWith("Deco", StringComparison.Ordinal) || leaf.Contains("Proj", StringComparison.Ordinal)
+                || leaf.Contains("Attachment", StringComparison.Ordinal) || leaf.EndsWith("FX", StringComparison.Ordinal)) continue;
+            var disp = cat.Display(path);
+            bool hasLoc = disp != leaf && !disp.All(c => c == '?');
+            string weapon = evoAt >= 0 ? IncarnonWeaponPrefix(path, evoAt) : "";
+            string nm = hasLoc ? (weapon.Length > 0 ? $"{weapon} · {disp}" : disp) : PrettyLeaf(leaf);
             if (nm.Length == 0 || nm.All(c => c == '?')) continue;
             candidates.Add(new CatalogItem { Path = path, Name = nm, Category = "Incarnon" });
+        }
+
+        // Amp Parts: the modular Operator-amp pieces (Prism / Scaffold / Brace) — stat-bearing weapon
+        // pieces under /OperatorAmplifiers/ (…BarrelPart = Prism, …ChassisPart = Scaffold, …GripPart = Brace).
+        // Otherwise they scatter into Misc Items; gather them into one submenu, prefixed by part type.
+        foreach (var (path, t) in r.Types)
+        {
+            if (!path.Contains("/OperatorAmplifiers/", StringComparison.Ordinal)) continue;
+            var leaf = Leaf(path);
+            if (leaf.EndsWith("Blueprint", StringComparison.Ordinal)) continue;
+            string kind = leaf.Contains("BarrelPart", StringComparison.Ordinal) || leaf.EndsWith("TrainingBarrel", StringComparison.Ordinal) ? "Prism"
+                        : leaf.Contains("ChassisPart", StringComparison.Ordinal) || leaf.EndsWith("TrainingChassis", StringComparison.Ordinal) ? "Scaffold"
+                        : leaf.Contains("GripPart", StringComparison.Ordinal) || leaf.EndsWith("TrainingGrip", StringComparison.Ordinal) ? "Brace"
+                        : "";
+            if (kind.Length == 0 || cat.EffProductCategory(path) != null) continue;   // stat-bearing weapon-piece only
+            var pn = cat.Display(path);
+            if (pn.Length == 0 || pn.All(c => c == '?')) continue;
+            var nm = pn.EndsWith(" " + kind, StringComparison.Ordinal) ? $"{kind} · {pn[..^(kind.Length + 1)]}" : $"{kind} · {pn}";
+            candidates.Add(new CatalogItem { Path = path, Name = nm, Category = "Amp Parts" });
         }
 
         // Dedupe each (category, name) to the single most-canonical variant
@@ -203,6 +228,14 @@ public sealed class MetadataCatalog
     }
 
     static string Leaf(string path) { int i = path.LastIndexOf('/'); return i < 0 ? path : path[(i + 1)..]; }
+
+    // Weapon name from a "…/<Weapon>IncarnonEvolutions/…" path (evoAt = index of "IncarnonEvolutions/").
+    // e.g. ".../ToridIncarnonEvolutions/ToridEvoTier1A" -> "Torid"; "DualIchor" -> "Dual Ichor".
+    static string IncarnonWeaponPrefix(string path, int evoAt)
+    {
+        int segStart = path.LastIndexOf('/', evoAt - 1) + 1;
+        return segStart < evoAt ? PrettyLeaf(path[segStart..evoAt]) : "";
+    }
 
     /// <summary>Localized display name via LocalizeTag, else the internal leaf name.</summary>
     string Display(string path)

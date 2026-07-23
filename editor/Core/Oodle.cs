@@ -22,11 +22,11 @@ public static unsafe class Oodle
     static IEnumerable<string> CandidatePaths()
     {
         if (!string.IsNullOrEmpty(DllPathOverride)) yield return DllPathOverride;
-        foreach (var n in DllNames) yield return Path.Combine(AppContext.BaseDirectory, n);      // bundled next to the exe
+        foreach (var n in DllNames) yield return Path.Combine(AppContext.BaseDirectory, n);      // next to the exe (if you copied it there)
         if (!string.IsNullOrEmpty(GameDir))
-            foreach (var n in DllNames) yield return Path.Combine(GameDir, n);                    // the user's Warframe install
-        // dev fallback
-        yield return @"C:\Users\Bartek\OneDrive\Dokumenter\Warframe RE PROJECT RENOVICE\tools\warframe-cache-tools\lib\oo2core_9.dll";
+            foreach (var n in DllNames) yield return Path.Combine(GameDir, n);                    // the Warframe folder you pointed at
+        foreach (var wf in Cache.WarframeInstallDirs())                                           // any auto-detected Warframe install (Steam/Epic/Docs)
+            foreach (var n in DllNames) yield return Path.Combine(wf, n);
     }
 
     public static void EnsureLoaded()

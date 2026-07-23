@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         "Warframes", "Necramechs", "Operator Suits", "Archwing",
         "Primary Weapons", "Secondary Weapons", "Melee Weapons", "Archwing Weapons",
         "Companion Weapons", "Amps", "Parazon",
-        "Mods", "Focus", "Rivens", "Arcanes", "Incarnon",
+        "Mods", "Focus", "Rivens", "Arcanes", "Incarnon", "Amp Parts",
         "Companions", "Railjack Crew", "Railjack Weapons", "Railjack",
         "Projectiles", "Gear & Consumables", "Boosters", "Vehicles",
     };
