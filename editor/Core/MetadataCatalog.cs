@@ -9,6 +9,8 @@ public sealed class CatalogItem
     public required string Path;
     public required string Name;
     public required string Category;
+
+    public override string ToString() => Name;
 }
 
 /// <summary>
@@ -21,6 +23,7 @@ public sealed class MetadataCatalog
     readonly Dictionary<string, string?> _pcCache = new(StringComparer.Ordinal);
     readonly Dictionary<string, string?> _tagCache = new(StringComparer.Ordinal);
     readonly Dictionary<string, string> _composed = new(StringComparer.Ordinal);
+    readonly Dictionary<string, SortedSet<string>> _enumValues = new(StringComparer.Ordinal);
     Dictionary<string, string>? _names;   // LocalizeTag -> localized display name
 
     /// <summary>Where a weapon's REAL riven strength lives: the riven mod + the per-weapon Attenuation.</summary>
@@ -56,6 +59,7 @@ public sealed class MetadataCatalog
         var candidates = new List<CatalogItem>();
         foreach (var (path, t) in r.Types)
         {
+            if (t.OwnText != null) cat.CollectEnumValues(t.OwnText);
             if (path.StartsWith("/Lotus/StoreItems/", StringComparison.Ordinal)) continue;
             var raw = cat.EffProductCategory(path);
             string friendly;
@@ -63,13 +67,14 @@ public sealed class MetadataCatalog
             {
                 friendly = FriendlyCategory(raw);
                 if (path.Contains("CrewMember", StringComparison.Ordinal)) friendly = "Railjack Crew";  // Ash*CrewMemberSuit etc.
+                friendly = FineCategory(friendly, path);
             }
             // Core mods (Serration, Stretch…) have ProductCategory ONLY on their StoreItems wrapper — the real
             // /Lotus/Upgrades/Mods/ type has none. Recognise them by path + a real name (skip rivens = /Randomized/).
             else if (path.StartsWith("/Lotus/Upgrades/Mods/", StringComparison.Ordinal)
                      && !path.Contains("/Randomized/", StringComparison.Ordinal)
                      && cat.EffLocalizeTag(path) != null)
-                friendly = "Mods";
+                friendly = FineCategory("Mods", path);
             else if (cat.EffIsProjectile(path)) friendly = "Projectiles";   // weapon projectiles (speed/AoE/lifespan/bounce…)
             else continue;
             var nm = cat.Display(path);
@@ -94,7 +99,7 @@ public sealed class MetadataCatalog
             if (real.StartsWith("/Lotus/Upgrades/CosmeticEnhancers/", StringComparison.Ordinal)) continue;   // arcanes -> the Arcanes pass below
             var mnm = cat.Display(real);
             if (mnm.Length > 0 && mnm.All(c => c == '?')) continue;
-            candidates.Add(new CatalogItem { Path = real, Name = mnm, Category = FriendlyCategory(raw) });
+            candidates.Add(new CatalogItem { Path = real, Name = mnm, Category = FineCategory(FriendlyCategory(raw), real) });
         }
 
         // Rivens category: one entry per INDIVIDUAL weapon that has a riven Attenuation.
@@ -195,12 +200,31 @@ public sealed class MetadataCatalog
             candidates.Add(new CatalogItem { Path = path, Name = nm, Category = "Arcanes" });
         }
 
+        // Native status handlers do not carry a ProductCategory, so they were previously invisible
+        // to the editor even though their composed metadata contains the stack, duration, DOT,
+        // radial-damage, and upgrade rules we want to patch. Surface every non-empty injury-handler
+        // DamageProc explicitly. The display name includes its scope so the normal enemy base,
+        // player/Tenno, VIP, faction, and Railjack variants cannot be confused with each other.
+        foreach (var (path, t) in r.Types)
+        {
+            if (string.IsNullOrWhiteSpace(t.OwnText) || !GameplayMetadata.IsStatusHandlerPath(path)) continue;
+            candidates.Add(new CatalogItem
+            {
+                Path = path,
+                Name = GameplayMetadata.StatusDisplayName(path),
+                Category = StatusCategory(path)
+            });
+        }
+
         // Dedupe each (category, name) to the single most-canonical variant
         // (drops AI/enemy/NPC/base clones that share a display name).
         var best = new Dictionary<(string, string), CatalogItem>();
         foreach (var it in candidates)
         {
-            var key = (it.Category, it.Name);
+            // Fine UI categories must not turn the same canonical mod into several catalog
+            // entries merely because one variant path classified differently.
+            string dedupeCategory = it.Category.StartsWith("Mods —", StringComparison.Ordinal) ? "Mods" : it.Category;
+            var key = (dedupeCategory, it.Name);
             if (!best.TryGetValue(key, out var cur) || VariantPenalty(it.Path) < VariantPenalty(cur.Path))
                 best[key] = it;
         }
@@ -216,6 +240,37 @@ public sealed class MetadataCatalog
         return cat;
     }
 
+    void CollectEnumValues(string text)
+    {
+        foreach (var rawLine in text.Replace("\r", "").Split('\n'))
+        {
+            var line = rawLine.Trim().TrimEnd(',');
+            int eq = line.IndexOf('=');
+            if (eq <= 0 || eq == line.Length - 1) continue;
+            string key = line[..eq];
+            string value = line[(eq + 1)..];
+            if (value.Length < 2 || value.Length > 96 || char.IsDigit(value[0])) continue;
+            if (!value.All(c => c is >= 'A' and <= 'Z' || c is >= '0' and <= '9' || c == '_')) continue;
+            if (!_enumValues.TryGetValue(key, out var values)) _enumValues[key] = values = new(StringComparer.Ordinal);
+            values.Add(value);
+        }
+    }
+
+    public IReadOnlyList<string> EnumOptions(string key, string currentValue)
+    {
+        if (!_enumValues.TryGetValue(key, out var all) || all.Count < 2) return Array.Empty<string>();
+        IEnumerable<string> values = all;
+        int underscore = currentValue.IndexOf('_');
+        if (underscore > 0)
+        {
+            string prefix = currentValue[..(underscore + 1)];
+            var sameFamily = all.Where(v => v.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+            if (sameFamily.Count >= 2) values = sameFamily;
+        }
+        var result = values.Take(400).ToList();
+        return result.Count >= 2 ? result : Array.Empty<string>();
+    }
+
     // Lower = more canonical. Penalise enemy/NPC/base clones; shorter path breaks ties.
     static int VariantPenalty(string path)
     {
@@ -226,6 +281,45 @@ public sealed class MetadataCatalog
         if (leaf.EndsWith("BaseSuit", StringComparison.Ordinal)) v += 3;
         if (leaf.Contains("Enemy", StringComparison.OrdinalIgnoreCase)) v += 3;
         return v * 10000 + path.Length;
+    }
+
+    static string FineCategory(string category, string path)
+    {
+        if (category != "Mods") return category;
+        if (path.Contains("/Aura/", StringComparison.Ordinal) || path.Contains("Stance", StringComparison.OrdinalIgnoreCase))
+            return "Mods — Aura & Stance";
+        if (path.Contains("/Warframe/", StringComparison.Ordinal) || path.Contains("Avatar", StringComparison.OrdinalIgnoreCase))
+            return "Mods — Warframe";
+        if (path.Contains("/Rifle/", StringComparison.Ordinal) || path.Contains("LongGun", StringComparison.OrdinalIgnoreCase))
+            return "Mods — Primary";
+        if (path.Contains("/Pistol/", StringComparison.Ordinal) || path.Contains("Secondary", StringComparison.OrdinalIgnoreCase))
+            return "Mods — Secondary";
+        if (path.Contains("/Melee/", StringComparison.Ordinal)) return "Mods — Melee";
+        if (path.Contains("Sentinel", StringComparison.OrdinalIgnoreCase) || path.Contains("Companion", StringComparison.OrdinalIgnoreCase)
+            || path.Contains("Kubrow", StringComparison.OrdinalIgnoreCase) || path.Contains("Kavat", StringComparison.OrdinalIgnoreCase))
+            return "Mods — Companion";
+        if (path.Contains("Archwing", StringComparison.OrdinalIgnoreCase) || path.Contains("Space", StringComparison.OrdinalIgnoreCase))
+            return "Mods — Archwing & Space";
+        return "Mods — Other";
+    }
+
+    static string StatusCategory(string path)
+    {
+        if (path.Contains("/SpaceBattles/", StringComparison.Ordinal)) return "Status Effects — Railjack / Space Combat";
+        if (path.Contains("/Player/", StringComparison.Ordinal) || path.Contains("Tenno", StringComparison.OrdinalIgnoreCase))
+            return "Status Effects — Player & Tenno";
+        string leaf = Leaf(path);
+        if (path.StartsWith("/Lotus/Types/Enemies/BaseInjuryHandlers/", StringComparison.Ordinal)
+            && leaf.StartsWith("Base", StringComparison.Ordinal))
+            return "Status Effects — Ordinary Ground Enemies";
+        if (leaf.StartsWith("NokkoVIP", StringComparison.Ordinal) || leaf.StartsWith("Triangle", StringComparison.Ordinal)
+            || path.StartsWith("/Lotus/Types/Enemies/", StringComparison.Ordinal)
+                && !path.StartsWith("/Lotus/Types/Enemies/BaseInjuryHandlers/", StringComparison.Ordinal)
+            || path.Contains("/Corpus/", StringComparison.Ordinal) || path.Contains("/Grineer/", StringComparison.Ordinal)
+            || path.Contains("/Infested/", StringComparison.Ordinal) || path.Contains("Sentient", StringComparison.OrdinalIgnoreCase)
+            || leaf.StartsWith("Vip", StringComparison.Ordinal))
+            return "Status Effects — Specialized Enemy Overrides";
+        return "Status Effects — Ordinary Ground Enemies";
     }
 
     // Raw ProductCategory -> human-friendly, grouped category name.
@@ -374,6 +468,12 @@ public sealed class MetadataCatalog
     }
 
     public string Parent(string path) => _types.TryGetValue(path, out var t) ? t.Parent : "";
+
+    /// <summary>Effective ProductCategory (own, else inherited) for an exact decoded type.</summary>
+    public string? ProductCategory(string path) => EffProductCategory(path);
+
+    /// <summary>Effective LocalizeTag (own, else inherited) for an exact decoded type.</summary>
+    public string? LocalizeTag(string path) => EffLocalizeTag(path);
 
     // ---------------- full offline dump ----------------
 

@@ -21,6 +21,12 @@ public record RivenWeapon(string ItemType, string Tail, string Attenuation);
 // Any scalar leaf in the tree, with an s|-ready anchor (its last named ancestors).
 public record Leaf(string Anchor, string Key, string Value, bool TopLevel);
 
+// A scalar or simple-set value with its exact query path. Unlike Leaf.Anchor,
+// QueryField.Path includes anonymous-array indices (for example
+// Behaviors.0.impact:LotusWeaponImpactBehavior.AttackData.DT_FIRE), so two
+// weapon fire modes never collapse onto the same broad regex anchor.
+public record QueryField(string Path, string Key, string Value, bool TopLevel, bool IsSet);
+
 // Parses an OpenWF client-metadata dump (.txt). First line ">/path", then
 // Key=Value / Key={...} lines. Indentation is unreliable, so nesting is tracked
 // by BRACE BALANCE, not whitespace. (Validated vs real dumps.)
@@ -92,6 +98,12 @@ public static class DumpParser
 // and a riven mod's ItemCompatibilities list.
 public static class Extract
 {
+    sealed class QueryFrame(string segment)
+    {
+        public string Segment { get; } = segment;
+        public int NextAnonymousIndex { get; set; }
+    }
+
     // Direct scalar children of each element of an Upgrades-style array block.
     // rootKey = "Upgrades" -> paths like "Upgrades.0.Value" (used with the q| op).
     public static List<UpgradeField> Upgrades(string rawBlock, string rootKey)
@@ -177,6 +189,130 @@ public static class Extract
     // Nesting tracked by brace balance; anon array elements push "" (skipped in anchors).
     public static List<Leaf> FlattenAll(string file) => FlattenLines(File.ReadAllLines(file));
     public static List<Leaf> FlattenAllText(string text) => FlattenLines(text.Replace("\r", "").Split('\n'));
+
+    /// <summary>
+    /// Returns every scalar and simple set with an exact q|-ready path. Named
+    /// blocks contribute their key and anonymous array entries contribute a
+    /// stable zero-based index. Complex blocks remain traversed; simple sets
+    /// such as ForcedProcs are returned as one editable {A,B} value.
+    /// </summary>
+    public static List<QueryField> QueryableText(string text)
+        => QueryableLines(text.Replace("\r", "").Split('\n'));
+
+    static List<QueryField> QueryableLines(string[] lines)
+    {
+        var fields = new List<QueryField>();
+        var stack = new List<QueryFrame>();
+
+        string CurrentPath(string key)
+        {
+            var segments = stack.Select(f => f.Segment).Where(s => s.Length > 0).Append(key);
+            return string.Join('.', segments);
+        }
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var raw = lines[i].Trim();
+            if (raw.Length == 0 || raw.StartsWith('>')) continue;
+            var token = raw.TrimEnd(',');
+
+            if (token == "{")
+            {
+                int index = stack.Count == 0 ? 0 : stack[^1].NextAnonymousIndex++;
+                stack.Add(new QueryFrame(index.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                continue;
+            }
+            if (token == "}")
+            {
+                if (stack.Count > 0) stack.RemoveAt(stack.Count - 1);
+                continue;
+            }
+
+            int eq = token.IndexOf('=');
+            if (eq <= 0) continue;
+            string key = token[..eq];
+            string value = token[(eq + 1)..];
+            int net = DumpParser.Count(value, '{') - DumpParser.Count(value, '}');
+            bool topLevel = stack.Count == 0;
+
+            if (net <= 0)
+            {
+                bool isSet = value.StartsWith('{') && value.EndsWith('}');
+                fields.Add(new QueryField(CurrentPath(key), key, value, topLevel, isSet));
+                if (isSet)
+                {
+                    string parentPath = CurrentPath(key);
+                    int index = 0;
+                    foreach (var item in SimpleSetValues(value))
+                        fields.Add(new QueryField($"{parentPath}.{index++}", key, item, false, false));
+                }
+                continue;
+            }
+
+            // A block containing only bare values is an editable simple set.
+            // A block containing another assignment/object is structural and
+            // must be traversed instead.
+            int depth = net;
+            int end = i;
+            bool simple = true;
+            var values = new List<string>();
+            for (int j = i + 1; j < lines.Length && depth > 0; j++)
+            {
+                var innerRaw = lines[j].Trim();
+                var inner = innerRaw.TrimEnd(',');
+                int innerNet = DumpParser.Count(innerRaw, '{') - DumpParser.Count(innerRaw, '}');
+                depth += innerNet;
+                end = j;
+                if (depth <= 0) break;
+                if (inner.Length == 0) continue;
+                if (inner is "{" or "}" || inner.Contains('=') || inner.Contains('{') || inner.Contains('}'))
+                {
+                    simple = false;
+                    break;
+                }
+                values.Add(inner);
+            }
+
+            if (simple && depth <= 0)
+            {
+                string parentPath = CurrentPath(key);
+                fields.Add(new QueryField(parentPath, key, "{" + string.Join(',', values) + "}", topLevel, true));
+                for (int index = 0; index < values.Count; index++)
+                    fields.Add(new QueryField($"{parentPath}.{index}", key, values[index], false, false));
+                i = end;
+            }
+            else
+            {
+                stack.Add(new QueryFrame(key));
+            }
+        }
+        return fields;
+    }
+
+    static IEnumerable<string> SimpleSetValues(string value)
+    {
+        string inner = value.Trim();
+        if (inner.Length < 2 || inner[0] != '{' || inner[^1] != '}') yield break;
+        inner = inner[1..^1];
+        var token = new System.Text.StringBuilder();
+        bool quoted = false, escaped = false;
+        foreach (char c in inner)
+        {
+            if (escaped) { token.Append(c); escaped = false; continue; }
+            if (c == '\\' && quoted) { token.Append(c); escaped = true; continue; }
+            if (c == '"') { token.Append(c); quoted = !quoted; continue; }
+            if (c == ',' && !quoted)
+            {
+                var item = token.ToString().Trim();
+                if (item.Length > 0) yield return item;
+                token.Clear();
+                continue;
+            }
+            token.Append(c);
+        }
+        var tail = token.ToString().Trim();
+        if (tail.Length > 0) yield return tail;
+    }
 
     static List<Leaf> FlattenLines(IEnumerable<string> src)
     {

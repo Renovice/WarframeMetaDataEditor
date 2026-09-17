@@ -1,0 +1,205 @@
+<Window x:Class="MetadataPatchEditor.GuidedMetadataWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:MetadataPatchEditor"
+        Title="Visual Status Editor" Height="850" Width="1320"
+        MinHeight="680" MinWidth="1040" WindowStartupLocation="CenterOwner"
+        Background="#0F1821">
+    <Window.Resources>
+        <SolidColorBrush x:Key="BorderBrush" Color="#30404F"/>
+        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#E6EDF3"/></Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource DarkTextBox}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource DialogButton}"/>
+        <Style x:Key="EffectCardButton" TargetType="Button" BasedOn="{StaticResource VisualCardButton}">
+            <Setter Property="Width" Value="330"/><Setter Property="MinHeight" Value="112"/>
+            <Setter Property="Margin" Value="0,0,10,10"/><Setter Property="Padding" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style x:Key="MetricCard" TargetType="Border" BasedOn="{StaticResource VisualStatCard}">
+            <Setter Property="MinHeight" Value="105"/><Setter Property="Margin" Value="0,0,10,10"/>
+        </Style>
+        <Style x:Key="FieldCard" TargetType="Border" BasedOn="{StaticResource VisualSectionBorder}">
+            <Setter Property="Margin" Value="0,0,0,10"/><Setter Property="Padding" Value="14,11"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#1C2B38"/><Setter Property="Foreground" Value="#DCE8EF"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/><Setter Property="Padding" Value="8,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource VisualSectionBorder}" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <local:GameplayIcon x:Name="HeaderIcon" Width="54" Height="54" Margin="0,0,14,0"/>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="Explanation" Margin="0,5,0,0" Foreground="#B9C7D0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="PathLabel" Margin="0,5,0,0" Foreground="#729BB2" TextTrimming="CharacterEllipsis" FontSize="11"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Text="STATUS FAMILY" Foreground="#7895A7" FontSize="10" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="StatusFamilyLabel" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Style="{StaticResource VisualSectionBorder}" Margin="0,0,12,0" Padding="14">
+                <Grid>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <StackPanel HorizontalAlignment="Center">
+                        <local:GameplayIcon x:Name="SidebarIcon" Width="76" Height="76"/>
+                        <TextBlock x:Name="ElementName" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,8,0,2"/>
+                        <TextBlock Text="STATUS BEHAVIOUR" Foreground="#7895A7" FontSize="10" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Margin="0,20,0,0">
+                        <Button x:Name="OverviewNav" Content="◈  Overview" Style="{StaticResource VisualNavButton}" Click="OverviewNav_Click"/>
+                        <Button x:Name="BehaviorNav" Content="↻  Behaviour &amp; stacks" Style="{StaticResource VisualNavButton}" Click="BehaviorNav_Click"/>
+                        <Button x:Name="DotNav" Content="◉  Damage over time" Style="{StaticResource VisualNavButton}" Click="DotNav_Click"/>
+                        <Button x:Name="EffectsNav" Content="✦  Status modifiers" Style="{StaticResource VisualNavButton}" Click="EffectsNav_Click"/>
+                        <Button x:Name="AdvancedNav" Content="⌘  Advanced" Style="{StaticResource VisualNavButton}" Click="AdvancedNav_Click"/>
+                    </StackPanel>
+                    <TextBlock x:Name="OverviewScope" Grid.Row="3" Foreground="#8FB6CA" TextWrapping="Wrap" FontSize="11"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1">
+                <ScrollViewer x:Name="OverviewPanel" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="2,0,4,8">
+                        <TextBlock Text="Status overview" FontSize="23" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="OverviewSummary" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="14" Foreground="#C9D8E1"/>
+                        <ItemsControl x:Name="MetricList" Margin="0,16,0,2">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                                <Border Style="{StaticResource MetricCard}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <local:GameplayIcon IconKey="{Binding Icon}" Accent="{Binding DataContext.StatusAccent, RelativeSource={RelativeSource AncestorType=Window}}" Width="35" Height="35" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Label}" Foreground="{Binding DataContext.StatusAccent, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Value}" FontSize="20" Margin="0,3,0,0"/>
+                                            <TextBlock Text="{Binding Hint}" Foreground="#95AABD" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="What happens when it procs" FontSize="17" FontWeight="SemiBold" Margin="0,8,0,4"/>
+                        <TextBlock Text="Click an effect card to open the exact controls that power it." Foreground="#8FB6CA"/>
+                        <ItemsControl x:Name="EffectList" Margin="0,10,0,2">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                                <Button Style="{StaticResource EffectCardButton}" Click="EffectStep_Click" Tag="{Binding TargetGroup}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                        <local:GameplayIcon IconKey="{Binding Icon}" Accent="{Binding DataContext.StatusAccent, RelativeSource={RelativeSource AncestorType=Window}}" Width="42" Height="42" Margin="0,0,12,0"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Title}" Foreground="{Binding DataContext.StatusAccent, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" FontSize="14" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Value}" Foreground="{Binding DataContext.StatusAccent, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold" Margin="0,2,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Description}" Margin="0,5,0,0" Foreground="#C7D4DC" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Margin="0,2,10,0" Padding="12" Background="#172A24" BorderBrush="#3D6D58" BorderThickness="1" CornerRadius="5">
+                            <DockPanel>
+                                <Button x:Name="DotBuilderButton" Content="Add DOT…" Click="DotBuilder_Click" DockPanel.Dock="Right" MinWidth="125" Margin="14,0,0,0" VerticalAlignment="Center"/>
+                                <local:GameplayIcon IconKey="dot" Accent="#76D4A2" Width="38" Height="38" DockPanel.Dock="Left" Margin="0,0,10,0"/>
+                                <StackPanel>
+                                    <TextBlock Text="Damage over time" Foreground="#76D4A2" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="DotCapabilityLabel" Margin="0,3,0,0" Foreground="#C7D4DC" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+                        <Border Margin="0,12,10,0" Style="{StaticResource VisualInfoBorder}">
+                            <StackPanel>
+                                <TextBlock Text="Handler rules" Foreground="#57B9E8" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="OverviewRules" Margin="0,4,0,0" Foreground="#BDD0DB" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer x:Name="GroupPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="2,0,8,8">
+                        <TextBlock x:Name="GroupHeading" FontSize="23" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="GroupExplanation" Margin="0,6,0,16" TextWrapping="Wrap" Foreground="#9FB5C4"/>
+                        <ItemsControl x:Name="GroupFieldList">
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                                <Border Style="{StaticResource FieldCard}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="285"/></Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,24,0">
+                                            <DockPanel>
+                                                <local:GameplayIcon IconKey="{Binding IconKey}" Accent="{Binding DataContext.StatusAccent, RelativeSource={RelativeSource AncestorType=Window}}" Width="25" Height="25" DockPanel.Dock="Left" Margin="0,0,9,0"/>
+                                                <TextBlock Text="{Binding Display}" Foreground="#E6EDF3" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Description}" Foreground="#A9BCC8" TextWrapping="Wrap" Margin="34,4,0,0"/>
+                                        </StackPanel>
+                                        <local:MetadataValueEditor Grid.Column="1" VerticalAlignment="Center" Value="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                                   EditorKind="{Binding EditorKind}" Options="{Binding Options}"
+                                                                   FieldKey="{Binding Key}" FieldDescription="{Binding Description}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="EmptyGroupLabel" Text="No editable fields are present in this handler section. The behavior is inherited or implemented by its native evaluator."
+                                   Foreground="#8FA4B2" TextWrapping="Wrap" Visibility="Collapsed" Margin="4,8"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Grid x:Name="AdvancedPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Advanced metadata" FontSize="23" FontWeight="SemiBold"/>
+                        <TextBlock Text="Search every supported field and inspect the exact emitted path. The visual pages above edit these same values." Margin="0,5,0,12" Foreground="#9FB5C4" TextWrapping="Wrap"/>
+                        <DockPanel Margin="0,0,0,8">
+                            <TextBlock Text="Search" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox x:Name="FilterBox" MinWidth="320" TextChanged="FilterBox_TextChanged"/>
+                            <TextBlock x:Name="CountLabel" Margin="12,0,0,0" VerticalAlignment="Center" Foreground="#8FA4B2"/>
+                            <CheckBox x:Name="AdvancedCheck" DockPanel.Dock="Right" Content="Show exact metadata paths" Foreground="#B9C7D0" VerticalAlignment="Center" Checked="AdvancedCheck_Changed" Unchecked="AdvancedCheck_Changed"/>
+                        </DockPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="Grid" Grid.Row="1" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False" HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal" Background="#121B24" Foreground="#E6EDF3" RowBackground="#16212B" AlternatingRowBackground="#1A2631"
+                              BorderBrush="{StaticResource BorderBrush}" SelectionMode="Single" MinRowHeight="34">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Section" Binding="{Binding Group}" IsReadOnly="True" Width="170"/>
+                            <DataGridTextColumn Header="Setting" Binding="{Binding Display}" IsReadOnly="True" Width="220"/>
+                            <DataGridTemplateColumn Header="Value" Width="230"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                                <local:MetadataValueEditor Value="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                           EditorKind="{Binding EditorKind}" Options="{Binding Options}"
+                                                           FieldKey="{Binding Key}" FieldDescription="{Binding Description}"/>
+                            </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="What it controls" Width="*" MinWidth="430" IsReadOnly="True"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Margin="6,4" Foreground="#C7D4DC"/>
+                            </DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            <DataGridTextColumn x:Name="ExactPathColumn" Header="Exact metadata path" Binding="{Binding Path}" IsReadOnly="True" Width="320" Visibility="Collapsed"/>
+                        </DataGrid.Columns>
+                        <DataGrid.RowStyle><Style TargetType="DataGridRow"><Style.Triggers>
+                            <DataTrigger Binding="{Binding IsChanged}" Value="True"><Setter Property="Background" Value="#29465A"/></DataTrigger>
+                        </Style.Triggers></Style></DataGrid.RowStyle>
+                    </DataGrid>
+                    <Border Grid.Row="2" Margin="0,9,0,0" Padding="10" Style="{StaticResource VisualSectionBorder}">
+                        <TextBlock x:Name="DetailLabel" Text="Select a setting to see what it controls." TextWrapping="Wrap" Foreground="#C7D4DC"/>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+            <TextBlock x:Name="StatusLabel" VerticalAlignment="Center" Foreground="#F2C777" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                <Button Content="Apply to Patch" Click="Apply_Click" MinWidth="145"/>
+                <Button Content="Cancel" Click="Cancel_Click" Margin="8,0,0,0" MinWidth="100" Style="{StaticResource SecondaryDialogButton}"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

@@ -164,15 +164,42 @@ Patch ops (documented in OpenWF's `Reference Manual.html`, proven in-game):
 - **`q|<dot.path>|value`** — query-assignment into the nested structure by index, e.g.
   `q|Upgrades.0.Value|123` or `q|Upgrades.0.OperationType|MULTIPLY`. **Proven in-game**
   (`ModDropChanceBooster.txt` uses `q|Upgrades.0.Value|2`; the game reads Value=2 back). Works on
-  **index-addressable** arrays like `Upgrades`; does **not** reach anonymous `{...}` lists (riven
-  `ItemCompatibilities` — those need `s|`).
+  parser-visible arrays generically, including anonymous metadata arrays: bootstrapper source routes
+  every numeric segment through `JsonArray::queryUp`. The current assignment writer is scalar-only;
+  it can set string/integer/float leaves but cannot replace a whole array/object node. Riven
+  `ItemCompatibilities` remains on its proven anchored `s|` path; guided weapon/status collection
+  fields are withheld until whole-block replacement is round-trip validated.
 - **`s|regex|replacement`** — Soup-regex substitution (anchored). Used for the riven per-weapon
   strength (the compat list isn't index-addressable).
 
 The editor surfaces, per item: top-level scalar fields as `Field` rows, `Upgrades.N.*` as `q|` rows
 (with `Operation / formula` and `Gain per rank` clearly labelled), warframe `LevelUpgrades` as
 per-level `q|` rows, riven strength as an anchored `s|` row, and numeric arrays as `arr` rows.
-It validates `OperationType`/`FusionLimit` against their allowed enum sets before saving.
+Status handlers and weapon attack profiles additionally receive exact structured scalar paths,
+friendly field descriptions, scope/fire-mode grouping, and damage/status validation. It validates
+`OperationType`/`FusionLimit`, damage enums, probabilities, boolean switches, and numeric ranges
+before saving.
+
+The primary weapon workflow is visual. Double-click a supported weapon or use **Open Visual Weapon
+Editor** to switch among Overview, Damage & Elements, Fire Controls, and Advanced. Damage components
+are presented as absolute per-shot values and active elements are clickable chips. Firing-state
+objects (`state:*Behavior`) are paired with their exact behavior index: `fireRate` is edited in its
+native rounds-per-minute unit and simultaneously displayed as shots per second (`RPM / 60`), while
+`reloadTime`, `ChargeTime`, and `BurstDelay` appear only when present on that state. Applying changes
+rewrites the complete parsed top-level container so unrelated crit, status, animation, and alternate
+mode data survive. Exact query paths remain available under Advanced instead of dominating the
+beginner view.
+
+`AttackData.ProcChance` is profile-owned too. The visual **Status & Procs** section displays it as a
+percentage and writes the decimal (`30% -> 0.3`) only to the selected direct/alternate/radial/DOT
+profile. The status-only apply path deliberately does not set `UseNewFormat`, recalculate `Amount`, or
+rewrite the damage-component encoding. Non-negative percentages above 100 are allowed instead of
+being rejected by an artificial editor cap. Forced proc collections remain separate and preserved.
+
+The visual shell styles are global application resources (`VisualNavButton`, `VisualCardButton`,
+`VisualStatCard`, `VisualSectionBorder`, and `VisualInfoBorder`). Weapon, guided status, and DOT
+windows now consume the same resources; raw paths remain an Advanced fallback for fields that do not
+yet have a category-specific visual surface.
 
 ---
 
@@ -189,18 +216,67 @@ Across all 1,977 `/Lotus/Upgrades/Mods/` types:
   `MULTIPLY` (115; separate final multiplier, e.g. damage-taken ×0.833) · `SET` (67; overwrite) ·
   `ADD_BASE` (4; add to base pre-multipliers). Semantics confirmed vs wiki + game logic.
 
-### 5.2 A mod's MAX RANK is NOT in the client cache
-Key finding, verified by diffing rank-5 **Reach** vs rank-3 **Quick Return**: same `FusionLimit`
-(`QA_MEDIUM`), same `BaseDrain`, **every rank-relevant field identical** — two mods with different
-max ranks are cache *twins*. So the 3-vs-5 cap is decided **outside** the patchable `Packages.bin`
-(DE public-export / server side). Cache `FusionLimit` is only a **coarse correlate**:
-- `QA_VERY_HIGH` ⟺ rank 10 (reliable) · **absent** ⟺ rank 5 (reliable) · `QA_MEDIUM` → **both 3 and 5**.
+### 5.2 A mod's exact MAX RANK is in Public Export, not the coarse cache enum
+The earlier Reach-vs-Quick-Return comparison was mislabeled: current Public Export identifies normal
+**Reach** and **Quick Return** as rank 3. The important architectural conclusion survives, but the
+authoritative evidence is now stronger. Each `ExportUpgrades` entry contains a numeric `fusionLimit`
+(for example normal Stretch=5, normal Reach=3, Serration=10), while `Packages.bin` exposes the separate
+coarse enum `FusionLimit=QA_*`. The client cache enum does not uniquely encode exact rank.
 
-Confirmed real max ranks (wiki, after stripping Beginner/Intermediate/Expert **training-variant**
-duplicates that share names): Serration/Vitality/Redirection = 10, Stretch/Intensify/Continuity = 5,
-Quick Return = 3, Transmute Cores / Astral Autopsy = 0. **Editing `FusionLimit` is therefore
-experimental** — it may nudge the tier flag but likely won't move the usable max rank. The editor
-offers it (with an "experimental" label) but the base `Value`/`OperationType` are the reliable levers.
+OpenWF serves `ExportUpgrades_<lang>.json` from `warframe-public-export-plus`, but basic owned-mod rank
+persistence is carried independently in the inventory `UpgradeFingerprint`. The editor therefore does
+**not** force these two layers to match:
+
+- client metadata may patch top-level `Rarity` and any explicitly selected `FusionLimit=QA_*` value;
+- the optional OpenWF component installs a package under `Metadata Patches/Enabled/<package>/` with
+  `patch.json` plus `upgrade-definitions.json`;
+- inventory migration is always false and no owned mod is edited implicitly.
+
+With the server component off (the default), OpenWF's WebUI, Public Export, drops, and definition-based
+tools remain vanilla while normal inventory persistence can preserve a client-owned `{"lvl":10}` mod.
+With it on, OpenWF validates every enabled package first and then overlays the shared in-memory export.
+Startup fails closed on malformed packages, duplicate IDs, unknown paths, invalid rarity/rank values,
+or field-level conflicts. Moving a package to `Metadata Patches/Disabled` restores the vanilla effective
+definition on restart without rewriting inventory. Stock numeric values 0/3/5/10 are directly evidenced;
+arbitrary intermediate server values remain **LIVE UNPROVEN**. The cache `FusionLimit` enum remains a
+client tier and is not presented as authoritative exact-rank data.
+
+### 5.2.1 Generic OpenWF server metadata overlays
+
+The mod dialog's `upgrade-definitions.json` remains the strongly typed convenience format for mod
+rarity and numeric fusion limit. The same package loader also accepts `server-definitions.json` for
+all mapped Public Export Plus datasets:
+
+```json
+{
+  "schemaVersion": 1,
+  "overrides": [
+    {
+      "dataset": "ExportWarframes",
+      "path": ["/Lotus/Powersuits/Bard/OctaviaPrime"],
+      "values": { "health": 999 }
+    }
+  ]
+}
+```
+
+`path` segments are strings for object properties and integers for array indices. Nested entries are
+therefore addressable without replacing their parent object. The editor discovers exact paths by
+matching a selected client `/Lotus/...` name against dataset keys and nested `uniqueName` fields.
+The current installed dependency exposes 44 object/array `Export*` datasets. Real-data probes resolve
+Octavia Prime directly in `ExportWarframes` and Bard Amplify/Amp as ability index 3 beneath both Bard
+and Octavia Prime.
+
+OpenWF resolves and validates every target before applying the plan. Existing non-null fields cannot
+change JSON kind, forbidden prototype keys are rejected recursively, all numbers must be finite, and
+two enabled packages cannot own the same dataset/path/field coordinate. The overlay mutates only the
+shared in-memory exported object after validation. Moving its package from `Enabled` to `Disabled`
+and restarting restores the dependency's vanilla value; inventory and save documents are never
+migrated. A newly added field has no effect unless some OpenWF consumer reads it.
+
+Some shipped Public Export JSON contains duplicate property names. JavaScript `JSON.parse` keeps the
+last occurrence. The C# discovery scanner deliberately normalizes the same way; using a dictionary
+constructor would throw and would disagree with the actual server runtime.
 
 ### 5.3 Warframe stats — base (reliable) + per-level (reliable)
 Base stats are **top-level scalar fields** (edited via the proven `Field` prepend), friendly-labelled
@@ -348,6 +424,21 @@ after exactly 455 sections — a structural proof the framing is exact — plus 
 downstream export post-processing (typographic-quote swaps, `|VAR|` interpolation), not parser errors.
 
 ---
+
+### 7.4 Visual status behavior is derived from composed handlers
+
+The beginner status view is not a separate gameplay model. It receives the same
+`GuidedField` values that Advanced edits, then derives four summary metrics and
+an effect chain from the selected composed handler. All 90 current-cache status
+records build a visual model; handler-specific missing fields remain inherited
+or absent rather than being filled with guessed numbers.
+
+Cold's `MaxStacks=9` is presented as nine repeated stacks after the first proc,
+or ten total procs to the cap. `RepeatFreezeModifier=0.05` is displayed as 5%
+per added stack. Reaching the cap is identified as the full-freeze trigger; no
+unexposed base slow is invented. `GameplayIcon` supplies DPI-independent vector
+art for the base physical, elemental, combined, Void, Tau, and common effect
+families without shipping external image assets.
 
 ## 8. Caveats (version-specific)
 

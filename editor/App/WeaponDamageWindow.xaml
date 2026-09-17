@@ -1,0 +1,253 @@
+<Window x:Class="MetadataPatchEditor.WeaponDamageWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Visual Weapon Editor" Width="1180" Height="820" MinWidth="980" MinHeight="680"
+        WindowStartupLocation="CenterOwner" Background="#0F1822">
+    <Window.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#14212D"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#182A37"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#2D4254"/>
+        <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#DCE8F2"/></Style>
+        <Style TargetType="TextBox" BasedOn="{StaticResource DarkTextBox}"/>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource DarkComboBox}"/>
+        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DarkComboBoxItem}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource DialogButton}"/>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#1C2B38"/><Setter Property="Foreground" Value="#DCE8EF"/>
+            <Setter Property="BorderBrush" Value="#30404F"/><Setter Property="Padding" Value="8,7"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="205"/><ColumnDefinition Width="14"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+        <Border Grid.Row="0" Grid.ColumnSpan="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" Padding="15" CornerRadius="5">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Margin="18,0,0,0">
+                    <TextBlock Text="Total base damage" Foreground="#8FB6CA" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="TotalText" FontSize="22" FontWeight="SemiBold" Foreground="#72D69A" HorizontalAlignment="Right"/>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock x:Name="Heading" FontSize="22" FontWeight="SemiBold"/>
+                    <TextBlock Margin="0,5,0,0" Foreground="#B6C8D4" TextWrapping="Wrap"
+                               Text="Choose a fire mode, then use the visual sections. Advanced metadata remains preserved but stays out of the way."/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="0" Margin="0,12,0,0" Background="#111E29" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="12">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="Raw paths are available under Advanced." Foreground="#8196A5" TextWrapping="Wrap" Margin="2,10,2,2"/>
+                <StackPanel>
+                    <TextBlock Text="WEAPON SECTIONS" Foreground="#7EC9EC" FontWeight="SemiBold" Margin="4,2,0,12"/>
+                    <Button x:Name="OverviewNav" Style="{StaticResource VisualNavButton}" Content="◈  Overview" Click="OverviewNav_Click"/>
+                    <Button x:Name="DamageNav" Style="{StaticResource VisualNavButton}" Content="✦  Damage &amp; elements" Click="DamageNav_Click"/>
+                    <Button x:Name="StatusNav" Style="{StaticResource VisualNavButton}" Content="◉  Status &amp; procs" Click="StatusNav_Click"/>
+                    <Button x:Name="FireNav" Style="{StaticResource VisualNavButton}" Content="▶  Fire controls" Click="FireNav_Click"/>
+                    <Button x:Name="AdvancedNav" Style="{StaticResource VisualNavButton}" Content="⌘  Advanced" Click="AdvancedNav_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1" Grid.Column="2" Margin="0,12,0,0">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="140"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <TextBlock Text="Damage profile" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <ComboBox x:Name="ProfileBox" Grid.Column="1" SelectionChanged="ProfileBox_SelectionChanged"/>
+            </Grid>
+
+            <Grid Grid.Row="1">
+                <ScrollViewer x:Name="OverviewPanel" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Weapon overview" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,5,0,14" Foreground="#AFC1CC" TextWrapping="Wrap"
+                                   Text="Click a stat card or element to jump directly to the controls that change it."/>
+                        <UniformGrid Columns="5" Margin="0,0,0,16">
+                            <Border Style="{StaticResource VisualStatCard}" MouseLeftButtonUp="DamageCard_Click">
+                                <StackPanel><TextBlock Text="✦ DAMAGE" Foreground="#7EC9EC" FontWeight="SemiBold"/><TextBlock x:Name="OverviewDamage" FontSize="23" Margin="0,6,0,0"/><TextBlock Text="Base damage per shot" Foreground="#91A5B2"/></StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource VisualStatCard}" MouseLeftButtonUp="StatusCard_Click">
+                                <StackPanel><TextBlock Text="◉ STATUS" Foreground="#76D4A2" FontWeight="SemiBold"/><TextBlock x:Name="OverviewStatusChance" FontSize="23" Margin="0,6,0,0"/><TextBlock Text="Chance per hit" Foreground="#91A5B2"/></StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource VisualStatCard}" MouseLeftButtonUp="FireCard_Click">
+                                <StackPanel><TextBlock Text="▶ FIRE RATE" Foreground="#F2C777" FontWeight="SemiBold"/><TextBlock x:Name="OverviewFireRate" FontSize="23" Margin="0,6,0,0"/><TextBlock Text="Shots each second" Foreground="#91A5B2"/></StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource VisualStatCard}" MouseLeftButtonUp="FireCard_Click">
+                                <StackPanel><TextBlock Text="↻ RELOAD" Foreground="#D5A7F0" FontWeight="SemiBold"/><TextBlock x:Name="OverviewReload" FontSize="23" Margin="0,6,0,0"/><TextBlock Text="Seconds" Foreground="#91A5B2"/></StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource VisualStatCard}" MouseLeftButtonUp="DamageCard_Click">
+                                <StackPanel><TextBlock Text="◉ ELEMENTS" Foreground="#76D4A2" FontWeight="SemiBold"/><TextBlock x:Name="OverviewElementCount" FontSize="23" Margin="0,6,0,0"/><TextBlock Text="Active damage types" Foreground="#91A5B2"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="14" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="Active damage types" FontSize="16" FontWeight="SemiBold"/>
+                                <TextBlock Text="Click one to edit its exact base damage." Foreground="#91A5B2" Margin="0,3,0,9"/>
+                                <ItemsControl x:Name="ElementChips">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Click="ElementChip_Click" Tag="{Binding Key}" Style="{StaticResource SecondaryDialogButton}" Margin="0,0,8,8" Padding="12,8">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="●" Foreground="{Binding Color}" FontSize="16" Margin="0,0,7,0"/>
+                                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="0,12,0,0" Background="#102532" BorderBrush="#2D7DA8" BorderThickness="1" Padding="14" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="How this profile works" Foreground="#57B9E8" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="OverviewExplanation" Margin="0,5,0,0" TextWrapping="Wrap" Foreground="#C7D4DC"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Grid x:Name="DamagePanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Damage &amp; elements" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,4,0,10" Foreground="#AFC1CC" TextWrapping="Wrap"
+                                   Text="Every number is absolute base damage. Zero removes a type; Add Damage Type creates another physical or elemental component."/>
+                    </StackPanel>
+                    <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="10">
+                        <DataGrid x:Name="DamageGrid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" Background="#101B25" Foreground="#E6EDF3"
+                                  RowBackground="#14212D" AlternatingRowBackground="#182632" BorderBrush="#30404F" SelectionMode="Single">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="Damage type" Width="250">
+                                    <DataGridTemplateColumn.CellTemplate><DataTemplate><StackPanel Orientation="Horizontal" Margin="5,2"><TextBlock Text="●" Foreground="{Binding Color}" FontSize="16" Margin="0,0,8,0"/><TextBlock Text="{Binding Name}" VerticalAlignment="Center"/></StackPanel></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Base damage" Width="300">
+                                    <DataGridTemplateColumn.CellTemplate><DataTemplate><TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalContentAlignment="Center"/></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate><Button Content="Remove" Padding="8,4" Style="{StaticResource SecondaryDialogButton}" Click="Remove_Click"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Border>
+                    <Border Grid.Row="2" Margin="0,10,0,0" Background="#10202C" BorderBrush="#29475A" BorderThickness="1" Padding="10">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="145"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="150"/><ColumnDefinition Width="12"/><ColumnDefinition Width="95"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="Add damage type" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <ComboBox x:Name="AddTypeBox" Grid.Column="1"/>
+                            <TextBox x:Name="AddAmountBox" Grid.Column="3" Text="10" VerticalContentAlignment="Center" ToolTip="Absolute base damage to add."/>
+                            <Button Grid.Column="5" Content="Add" Click="Add_Click"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <ScrollViewer x:Name="StatusPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Status &amp; procs" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,4,0,10" Foreground="#AFC1CC" TextWrapping="Wrap"
+                                   Text="Status chance belongs to the selected attack profile. Primary, alternate, radial, and special attacks can have different chances."/>
+                        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="15" CornerRadius="5">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="260"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="Status chance" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Probability that this attack rolls a normal status effect on each hit." Foreground="#91A5B2" TextWrapping="Wrap" Margin="0,3,18,0"/>
+                                </StackPanel>
+                                <Grid Grid.Column="1">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="48"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="StatusChanceBox" FontSize="18" VerticalContentAlignment="Center" TextChanged="StatusChance_TextChanged"/>
+                                    <Border Grid.Column="1" Background="#102532" BorderBrush="#315269" BorderThickness="1" Padding="9">
+                                        <TextBlock Text="%" FontSize="18" HorizontalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+
+                                <StackPanel Grid.Row="1" Margin="0,17,18,0">
+                                    <TextBlock Text="Native stored value" FontWeight="SemiBold"/>
+                                    <TextBlock Text="The game stores status chance as a decimal. The editor converts the percentage for you." Foreground="#91A5B2" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <Border Grid.Row="1" Grid.Column="1" Margin="0,15,0,0" Background="#10202C" BorderBrush="#29475A" BorderThickness="1" Padding="10">
+                                    <TextBlock x:Name="StatusChanceNativeText" FontFamily="Consolas"/>
+                                </Border>
+
+                                <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,17,0,0">
+                                    <TextBlock x:Name="StatusProfileText" Foreground="#8FB6CA" TextWrapping="Wrap"/>
+                                    <TextBlock Margin="0,5,0,0" Foreground="#BFD0DA" TextWrapping="Wrap"
+                                               Text="Damage elements are edited separately under Damage &amp; elements. Guaranteed or forced procs are separate from this random status-chance roll and remain preserved."/>
+                                    <Button Content="Edit damage elements" Click="DamageNav_Click" Style="{StaticResource SecondaryDialogButton}"
+                                            HorizontalAlignment="Left" Margin="0,12,0,0" Padding="12,7"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Margin="0,12,0,0" Padding="12" Background="#172A24" BorderBrush="#3D6D58" BorderThickness="1" CornerRadius="4">
+                            <TextBlock TextWrapping="Wrap" Text="Enter the readable percentage here. For example, 30% writes ProcChance=0.3. Values above 100% remain available for attacks that should roll additional status instances."/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer x:Name="FirePanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Fire controls" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,4,0,10" Foreground="#AFC1CC" TextWrapping="Wrap"
+                                   Text="These values belong to one exact firing state. Primary, alternate, charged, burst, and special modes can be different."/>
+                        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="15">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="245"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <TextBlock Text="Firing state" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <ComboBox x:Name="FireControlBox" Grid.Column="1" SelectionChanged="FireControlBox_SelectionChanged"/>
+
+                                <StackPanel Grid.Row="1" Margin="0,18,18,0"><TextBlock Text="Fire rate (RPM)" FontWeight="SemiBold"/><TextBlock Text="Native rounds-per-minute value for this exact firing state." Foreground="#91A5B2" TextWrapping="Wrap"/></StackPanel>
+                                <Grid Grid.Row="1" Grid.Column="1" Margin="0,15,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="130"/></Grid.ColumnDefinitions><TextBox x:Name="FireRateBox" TextChanged="FireControl_TextChanged"/><Border Grid.Column="1" Margin="8,0,0,0" Background="#102532" BorderBrush="#315269" BorderThickness="1" Padding="8"><StackPanel><TextBlock x:Name="ShotsPerSecondText" FontWeight="SemiBold" HorizontalAlignment="Center"/><TextBlock Text="shots / second" Foreground="#91A5B2" HorizontalAlignment="Center"/></StackPanel></Border></Grid>
+
+                                <StackPanel x:Name="ReloadLabel" Grid.Row="2" Margin="0,18,18,0"><TextBlock Text="Reload time" FontWeight="SemiBold"/><TextBlock Text="Seconds required to reload this state." Foreground="#91A5B2" TextWrapping="Wrap"/></StackPanel>
+                                <TextBox x:Name="ReloadBox" Grid.Row="2" Grid.Column="1" Margin="0,15,0,0" TextChanged="FireControl_TextChanged"/>
+
+                                <StackPanel x:Name="ChargeLabel" Grid.Row="3" Margin="0,18,18,0"><TextBlock Text="Charge time" FontWeight="SemiBold"/><TextBlock Text="Seconds required to reach a full charge." Foreground="#91A5B2" TextWrapping="Wrap"/></StackPanel>
+                                <TextBox x:Name="ChargeBox" Grid.Row="3" Grid.Column="1" Margin="0,15,0,0" TextChanged="FireControl_TextChanged"/>
+
+                                <StackPanel x:Name="BurstLabel" Grid.Row="4" Margin="0,18,18,0"><TextBlock Text="Burst delay" FontWeight="SemiBold"/><TextBlock Text="Seconds between burst sequences." Foreground="#91A5B2" TextWrapping="Wrap"/></StackPanel>
+                                <TextBox x:Name="BurstBox" Grid.Row="4" Grid.Column="1" Margin="0,15,0,0" TextChanged="FireControl_TextChanged"/>
+                            </Grid>
+                        </Border>
+                        <Border Margin="0,12,0,0" Padding="12" Background="#172A24" BorderBrush="#3D6D58" BorderThickness="1">
+                            <TextBlock TextWrapping="Wrap" Text="Edit RPM on the left; the editor converts it to shots/second on the right. The patch writes the exact native RPM field."/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <ScrollViewer x:Name="AdvancedPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Advanced metadata" FontSize="20" FontWeight="SemiBold"/>
+                        <TextBlock Margin="0,4,0,12" Foreground="#AFC1CC" TextWrapping="Wrap"
+                                   Text="Use this only when you need to verify exact ownership. Normal editing does not require metadata path knowledge."/>
+                        <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="15">
+                            <StackPanel>
+                                <TextBlock Text="Selected damage path" Foreground="#7EC9EC" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="DamagePathText" Margin="0,4,0,12" TextWrapping="Wrap" FontFamily="Consolas"/>
+                                <TextBlock Text="Selected firing-state path" Foreground="#F2C777" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="FirePathText" Margin="0,4,0,12" TextWrapping="Wrap" FontFamily="Consolas"/>
+                                <TextBlock Text="Selected status-chance path" Foreground="#76D4A2" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="StatusPathText" Margin="0,4,0,12" TextWrapping="Wrap" FontFamily="Consolas"/>
+                                <TextBlock Text="Storage format" Foreground="#76D4A2" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="FormatNote" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <DockPanel Grid.Row="2" Grid.ColumnSpan="3" Margin="0,13,0,0">
+            <TextBlock x:Name="StatusText" Foreground="#F0B16B" VerticalAlignment="Center" TextWrapping="Wrap"/>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Apply to Patch" Click="Apply_Click" MinWidth="140"/>
+                <Button Content="Cancel" Click="Cancel_Click" Margin="8,0,0,0" Style="{StaticResource SecondaryDialogButton}" MinWidth="90"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

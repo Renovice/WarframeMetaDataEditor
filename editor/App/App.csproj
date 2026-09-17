@@ -7,6 +7,7 @@
     <UseWPF>true</UseWPF>
     <AssemblyName>MetadataPatchEditor</AssemblyName>
     <RootNamespace>MetadataPatchEditor</RootNamespace>
+    <BuildDropEnabled Condition="'$(BuildDropEnabled)' == ''">true</BuildDropEnabled>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Core\Core.csproj" />
@@ -21,7 +22,7 @@
     <Copy SourceFiles="..\lib\oo2core_9.dll" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
   </Target>
   <!-- Also drop the finished self-contained exe (+ Oodle if present) into the top-level Build\ folder. -->
-  <Target Name="CopyToBuildFolder" AfterTargets="Publish">
+  <Target Name="CopyToBuildFolder" AfterTargets="Publish" Condition="'$(BuildDropEnabled)' == 'true'">
     <PropertyGroup>
       <BuildDrop>$(MSBuildProjectDirectory)\..\..\Build\</BuildDrop>
     </PropertyGroup>
