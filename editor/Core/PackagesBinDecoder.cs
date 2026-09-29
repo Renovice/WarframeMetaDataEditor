@@ -106,7 +106,10 @@ public static unsafe class PackagesBinDecoder
     {
         int min = (entityCount + textCount + 7) / 8;          // minimum bytes to hold every bit
         for (int len = min; len <= min + 8; len++)
-            for (int gap = 0; gap <= 512; gap++)
+            // U44 (2026.09.24.13.29) has 930 bytes between these buffers.
+            // Keep the search bounded, using the same limit as FindComSize;
+            // entity/text bit count and downstream full decode still validate it.
+            for (int gap = 0; gap <= 8192; gap++)
             {
                 int off = csOff - gap - 4 - len;
                 if (off < 0) break;
