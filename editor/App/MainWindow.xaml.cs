@@ -40,7 +40,7 @@ public partial class MainWindow : Window
     };
     readonly List<FieldRow> _allRows = new();
     readonly ObservableCollection<FieldRow> _rows = new();
-    FieldRow? _rivenStrengthRow, _rivenDotsRow;   // current Rivens selection's two rows
+    FieldRow? _rivenStrengthRow;   // current Rivens selection's strength row
 
     public MainWindow()
     {
@@ -446,7 +446,7 @@ public partial class MainWindow : Window
     void ItemList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         _allRows.Clear(); _rows.Clear(); Preview.Clear(); _itemPath = ""; _patchPreamble = ""; _pendingUpgradeOverride = null; _pendingServerMetadataOverride = null; _pendingWeaponDamage = null;
-        _rivenStrengthRow = null; _rivenDotsRow = null; RivenReadout.Text = "";
+        _rivenStrengthRow = null; RivenReadout.Text = "";
         GameplayMetadataBtn.IsEnabled = false;
         GameplayMetadataBtn.Content = "Open Visual Editor…";
         ModEffectBtn.IsEnabled = false;
@@ -458,26 +458,19 @@ public partial class MainWindow : Window
             if (_catalog.Rivens.TryGetValue(item.Path, out var rv))
             {
                 _itemPath = item.Path;   // rows carry explicit Target; this is just a reference
-                PathText.Text = $"{name}   riven   →   strength in {rv.ModPath.Split('/').Last()}, dots on the weapon";
+                PathText.Text = $"{name}   riven   →   strength in {rv.ModPath.Split('/').Last()}";
 
-                // Real uncapped strength — anchored to THIS weapon, patches the riven mod.
+                // Real uncapped strength — anchored to THIS weapon, patches the riven mod. The disposition dots
+                // (weapon OmegaAttenuation) aren't offered: DE hid them in the client and shows every weapon at 1.2.
                 _rivenStrengthRow = new FieldRow { Key = "Riven Strength (Attenuation)", Path = rv.WeaponTail, Op = "riven",
                                                    Target = rv.ModPath, Original = rv.Attenuation, Value = rv.Attenuation };
                 _allRows.Add(_rivenStrengthRow);
 
-                // Cosmetic dots (0.5–1.55) — patches the weapon itself.
-                var omega = DumpParser.ParseText(_catalog.ComposedText(item.Path)).TopLevel.FirstOrDefault(f => f.Key == "OmegaAttenuation");
-                var oval = omega != null ? PatchGenerator.Compact(omega.RawValue) : "1.55";
-                _rivenDotsRow = new FieldRow { Key = "Riven Dots (OmegaAttenuation)", Path = "(weapon)", Op = "Field",
-                                               Target = item.Path, Original = oval, Value = oval };
-                _allRows.Add(_rivenDotsRow);
-
                 _rivenStrengthRow.PropertyChanged += RivenRowChanged;
-                _rivenDotsRow.PropertyChanged += RivenRowChanged;
                 UpdateRivenReadout();
 
                 PatchName.Text = name.Replace(" ", "") + "Riven.txt";
-                Status.Text = $"Strength = real uncapped multiplier (anchored to {name}); Dots = cosmetic 0.5–1.55. Both edit ONLY this weapon.";
+                Status.Text = $"Strength = real uncapped multiplier (anchored to {name}). Edits ONLY this weapon.";
                 DecorateAndRefreshGroups();
                 ApplyFieldFilter();
             }
@@ -1100,7 +1093,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            // group by target type so multi-type edits (e.g. riven strength on the mod + dots on the weapon) each get a block
+            // group by target type so multi-type edits (rows whose Target is a different file than the selected item) each get a block
             foreach (var grp in changed.GroupBy(r => string.IsNullOrEmpty(r.Target) ? _itemPath : r.Target))
             {
                 sb.Append(grp.Key).Append('\n');
@@ -1402,14 +1395,12 @@ public partial class MainWindow : Window
         if (!double.TryParse(MultBox.Text, System.Globalization.NumberStyles.Any, inv, out var n) || n <= 0)
         { Status.Text = "Enter a positive multiplier (e.g. 5)."; return; }
 
-        if (_rivenStrengthRow != null)   // Rivens: scale strength (+ tied dots)
+        if (_rivenStrengthRow != null)   // Rivens: scale strength
         {
             if (!double.TryParse(_rivenStrengthRow.Original, System.Globalization.NumberStyles.Any, inv, out var baseStr))
             { Status.Text = "Couldn't read the base strength value."; return; }
             _rivenStrengthRow.Value = (baseStr * n).ToString("0.#######", inv);
-            if (_rivenDotsRow != null && double.TryParse(_rivenDotsRow.Original, System.Globalization.NumberStyles.Any, inv, out var baseDots))
-                _rivenDotsRow.Value = Math.Clamp(baseDots * n, 0.5, 1.55).ToString("0.#######", inv);
-            Status.Text = $"×{n}: strength {_rivenStrengthRow.Original} → {_rivenStrengthRow.Value}, dots → {_rivenDotsRow?.Value} (this weapon only).";
+            Status.Text = $"×{n}: strength {_rivenStrengthRow.Original} → {_rivenStrengthRow.Value} (this weapon only).";
         }
         else   // Mods / warframes: multiply every per-rank / per-level Value (q| rows) — scales the whole curve
         {
@@ -1428,8 +1419,7 @@ public partial class MainWindow : Window
     void UpdateRivenReadout()
     {
         if (_rivenStrengthRow == null) { RivenReadout.Text = ""; return; }
-        var dots = _rivenDotsRow != null ? $"    dots {_rivenDotsRow.Value}" : "";
-        RivenReadout.Text = $"strength {_rivenStrengthRow.Original} → {_rivenStrengthRow.Value}{dots}";
+        RivenReadout.Text = $"strength {_rivenStrengthRow.Original} → {_rivenStrengthRow.Value}";
     }
 
     void ResetBtn_Click(object sender, RoutedEventArgs e)

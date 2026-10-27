@@ -297,9 +297,11 @@ per-level increment; Octavia +10 health / +10 shield / +5 energy per level), exp
 
 ### 5.4 Riven strength (individual weapon)
 Real riven strength = the per-weapon **`Attenuation`** inside the riven mod's `ItemCompatibilities`
-(uncapped, real multiplier), **not** `OmegaAttenuation` (that's the cosmetic dots, 0.5–1.55 on the
-weapon). The editor patches strength with an **anchored `s|`** so it hits **only that weapon**
-(the compat list isn't `q|`-indexable). `Scale ×` multiplies strength (+ tied dots) for rivens, or
+(uncapped, real multiplier), **not** `OmegaAttenuation` (the disposition dots, 0.5–1.55 on the
+weapon). DE has since hidden the dots in the client (every weapon displays 1.2), so the editor no longer
+offers a dots row (removed 2026-10-28); the backend `Attenuation` multiplier still applies and is what
+the editor patches, with an **anchored `s|`** so it hits **only that weapon**
+(the compat list isn't `q|`-indexable). `Scale ×` multiplies strength for rivens, or
 the per-rank/per-level `Value`s for mods/warframes.
 
 ---
